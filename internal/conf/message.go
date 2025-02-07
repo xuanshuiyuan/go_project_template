@@ -20,5 +20,15 @@ var WxApp = map[string]map[string]interface{}{
 }
 
 var Sms = map[string]map[string]interface{}{
-
+	"AlismsXcc": map[string]interface{}{
+		"accessKeyId":     "",
+		"accessKeySecret": "1icjoElV9Q6y1QeJv2jCuOP40u16jc",
+		"SignName":        "test",
+		"Channel":         "NewAlismsXcc",
+		"LoginCode": map[string]interface{}{ //响车车登录确认验证码
+			"Code":    "SMS_137820295",
+			"Message": "验证码%s，您正在登录，若非本人操作，请勿泄露。", //
+			"Params":  "{\"code\":\"%s\"}",
+		},
+	},
 }
