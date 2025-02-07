@@ -1,6 +1,6 @@
 [base]
 LogPath = '../../target/logs/'
-LogFileName = "test"
+LogFileName = "go_project_template"
 
 [iris]
 DisablePathCorrection = false
@@ -8,7 +8,7 @@ EnablePathEscape = false
 FireMethodNotAllowed = true
 DisableBodyConsumptionOnUnmarshal = false
 Charset = "UTF-8"
-Port = 12
+Port = 15000
 
 [Mysql]
 Hostname = "Hostname"
