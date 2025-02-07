@@ -82,5 +82,6 @@ traverse_dir "."
 
 cp cmd/conf/local/logic.toml cmd/conf/develop/logic.toml
 cp cmd/conf/local/logic.toml cmd/conf/production/logic.toml
+cp cmd/conf/local/logic.toml target/logic.toml
 
 echo "初始化完成"
