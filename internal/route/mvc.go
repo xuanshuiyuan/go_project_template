@@ -26,6 +26,8 @@ func Init() *Service {
 func New(app *mvc.Application) {
 	conf.ConfInit() //初始化配置文件
 	//engine.NewEngine() //初始化数据库
+	//alisms.NewAlisms()       //初始化阿里云短信
+	//delay_queue.New()        //初始化延迟队列
 	app.Handle(Init())
 }
 

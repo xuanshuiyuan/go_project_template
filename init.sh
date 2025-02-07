@@ -11,12 +11,15 @@ fi
 # 要过滤的目录列表
 exclude_dirs=(".git") # 将此处替换为你想要过滤的目录名
 
+old_project_name="go_project_template"
+old_port=15000
+
 # 文件名中包含的指定字符串及替换后的新字符串
-filename_search_string="go_project_template"
+filename_search_string=$old_project_name
 filename_replace_string=$project_name
 
 # 文件内容中要替换的字符串
-content_search_string="go_project_template"
+content_search_string=$old_project_name
 content_replace_string=$project_name
 
 # 使用sed命令替换文件中的字符串
@@ -30,7 +33,7 @@ if [ -z "$port" ]; then
   echo "端口号不能为空"
   exit 0
 else
-  sed -i '' "s|15000|$port|g" cmd/conf/local/logic.toml
+  sed -i '' "s|$old_port|$port|g" cmd/conf/local/logic.toml
 fi
 #echo "配置文件更新完成"
 ##
