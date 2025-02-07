@@ -1,0 +1,43 @@
+[base]
+LogPath = '../../target/logs/'
+LogFileName = "test"
+
+[iris]
+DisablePathCorrection = false
+EnablePathEscape = false
+FireMethodNotAllowed = true
+DisableBodyConsumptionOnUnmarshal = false
+Charset = "UTF-8"
+Port = 12
+
+[Mysql]
+Hostname = "Hostname"
+Username = "Username"
+Password = "Password"
+Port = 3306
+DataBase = "Mysql"
+Drive = "mysql"
+Network = "tcp"
+Charset = "utf8mb4,utf8"
+TimeZone = "Asia%2FShanghai"
+DbLogMode = true
+
+[Redis]
+Network = "tcp"
+Addr = "127.0.0.1:6379"
+Auth = "Auth"
+Active = 60000
+Idle = 1024
+DialTimeout = "200ms"
+ReadTimeout = "500ms"
+WriteTimeout = "500ms"
+IdleTimeout = "120s"
+Expire = "30m"
+DataBase = 12
+
+[Mongodb]
+Hostname = "Hostname"
+Username = "Username"
+Password = "Password"
+Port = 3717
+ConnectStr = "ConnectStr"
