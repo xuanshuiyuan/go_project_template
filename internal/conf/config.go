@@ -4,7 +4,7 @@ package conf
 const ParamsSignkey = "go_project_template"
 const RedisTokenKey = "go_project_template_"
 const RedisAdminTokenKey = "go_project_template_"
-const RedisWebTokenKey = "go_project_templated_"
+const RedisWebTokenKey = "go_project_template_"
 const RedisTokenExp = "7200"                           //登陆token的有效时间 2小时
 const RedisLockExp = "30"                              //redis分布式锁 30秒
 const RedisWebRegisterKey = "1010KYXDFGCKV02LQPV9RG76" //web端注册redis锁key

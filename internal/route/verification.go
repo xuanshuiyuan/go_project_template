@@ -18,8 +18,8 @@ import (
 const RequestHeaderParamsDevelop = "develop"
 const RequestFailTip = "Im Invalid Request!"
 
-//adminRequestHeaderParams B端的接口请求头部字段
-type adminRequestHeaderParams struct {
+//RequestHeaderParams B端的接口请求头部字段
+type RequestHeaderParams struct {
 	Token     string `json:"token"`
 	Sign      string `json:"sign"`
 	Timestamp int64  `json:"timestamp"`
@@ -124,7 +124,7 @@ func (s *Service) WebVerification(c context.Context) {
 		}
 	}
 	user_id, _ := strconv.ParseInt(c.GetHeader("userid"), 10, 64)
-	requestHeaderParams := adminRequestHeaderParams{
+	requestHeaderParams := RequestHeaderParams{
 		Token:  c.GetHeader("token"),
 		Userid: user_id,
 	}
@@ -161,7 +161,7 @@ func (s *Service) AdminVerification(c context.Context) {
 		}
 	}
 	user_id, _ := strconv.ParseInt(c.GetHeader("userid"), 10, 64)
-	requestHeaderParams := adminRequestHeaderParams{
+	requestHeaderParams := RequestHeaderParams{
 		Token:  c.GetHeader("token"),
 		Userid: user_id,
 	}
@@ -228,7 +228,7 @@ func (s *Service) Verification(c context.Context) {
 			return
 		}
 	}
-	requestHeaderParams := adminRequestHeaderParams{
+	requestHeaderParams := RequestHeaderParams{
 		Token: c.GetHeader("token"),
 	}
 	//redis验证token
@@ -249,7 +249,7 @@ func (s *Service) verification(c context.Context) error {
 		}
 	}
 	timestamp, _ := strconv.ParseInt(c.GetHeader("timestamp"), 10, 64)
-	requestHeaderParams := adminRequestHeaderParams{
+	requestHeaderParams := RequestHeaderParams{
 		Timestamp: timestamp,
 		Sign:      c.GetHeader("sign"),
 		Source:    c.GetHeader("source"),
