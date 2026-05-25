@@ -9,7 +9,7 @@ require (
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kataras/iris/v12 v12.1.8
-	github.com/xuanshuiyuan/goxy v1.4.2-0.20240911092000-c8dcf006f87e
+	github.com/xuanshuiyuan/goxy v1.4.5
 	go.mongodb.org/mongo-driver v1.2.0
 	golang.org/x/net v0.20.0
 	gorm.io/driver/mysql v1.4.7
@@ -33,7 +33,7 @@ require (
 	github.com/alibabacloud-go/dysmsapi-20170525/v2 v2.0.18
 	github.com/alibabacloud-go/tea v1.2.2
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
-	github.com/xuanshuiyuan/delay_queue v1.0.6
+	github.com/xuanshuiyuan/delay_queue v1.0.7
 )
 
 require (

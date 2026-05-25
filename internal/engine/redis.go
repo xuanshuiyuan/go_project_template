@@ -35,10 +35,9 @@ func RedisClose() error {
 	return DB.Redis.Close()
 }
 
-// Ping dao ping.
 func RedisPing() (err error) {
 	conn := DB.Redis.Get()
-	_, err = conn.Do("SET", "PING", "PONG")
+	_, err = conn.Do("PING")
 	conn.Close()
 	return
 }

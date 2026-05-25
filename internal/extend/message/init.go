@@ -4,11 +4,10 @@ package message
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"github.com/xuanshuiyuan/goxy"
 	"go_project_template/internal/engine"
 	"go_project_template/internal/models"
-	"strings"
 	"time"
 )
 
@@ -131,11 +130,8 @@ func (p *PushService) SendBatch() (err error) {
 // @Title addLogs
 // @Description 消息推送队列
 func addLogs(data []models.MessagePushQueue) {
-	sql := []string{}
-	for _, v := range data {
-		sql = append(sql, fmt.Sprintf("('%s', '%s', %d, '%s', '%s','%s', '%s', %d, '%s', %d)", v.Sender, v.Receiver, v.Channel, v.Type, v.TemplateCode, v.Content, v.Params, v.Status, v.Reason, time.Now().Unix()))
+	for i := range data {
+		data[i].CreateTime = time.Now().Unix()
 	}
-	sqls := strings.Join(sql, ",")
-	exec := "INSERT INTO `message_push_queue` (sender,receiver,channel,type,template_code,content,params,status,reason,create_time) VALUES  " + sqls
-	engine.DB.Mysql.Exec(exec)
+	engine.DB.Mysql.Create(&data)
 }

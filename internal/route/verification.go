@@ -3,13 +3,13 @@ package route
 
 import (
 	"crypto/md5"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"github.com/kataras/iris/v12/context"
 	"github.com/xuanshuiyuan/goxy"
 	"go_project_template/internal/conf"
 	"go_project_template/internal/utils"
-	"net"
 	"os"
 	"strconv"
 	"time"
@@ -30,29 +30,13 @@ type RequestHeaderParams struct {
 	Edition   string `json:"edition"`
 }
 
-func getLocalIP() string {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return ""
-	}
-	for _, address := range addrs {
-		// 检查ip地址判断是否回环地址
-		if ip_net, ok := address.(*net.IPNet); ok && !ip_net.IP.IsLoopback() {
-			if ip_net.IP.To4() != nil {
-				return ip_net.IP.String()
-			}
-		}
-	}
-	return ""
-}
-
 // @Title ApiTimerVerification
 // @Description 计划任务接口验证,内网才能访问
 // @Author xuanshuiyuan 2021-10-31 16:01
 // @Param context.Context
 // @Return int64, string
 func (s *Service) ApiTimerVerification(c context.Context) {
-	ip := getLocalIP()
+	ip, _ := utils.GetLocalIP()
 	next := false
 	for _, v := range conf.Config.Conf.ApiTimer.Ip {
 		if ip == v {
@@ -193,13 +177,17 @@ func (s *Service) AuthApiVerification(c context.Context) (err error) {
 	if admin_info["api"] == nil {
 		return errors.New("无权操作")
 	}
+	apiList, ok := admin_info["api"].([]interface{})
+	if !ok {
+		return errors.New("无权操作")
+	}
 	isdo := false
 	path := c.Path()
 	if goxy.StringsInSearch(path, conf.AuthApiNoVerification) {
 		isdo = true
 	} else {
-		for _, v := range admin_info["api"].([]interface{}) {
-			if path == v {
+		for _, v := range apiList {
+			if s, ok := v.(string); ok && path == s {
 				isdo = true
 				break
 			}
@@ -266,7 +254,7 @@ func (s *Service) verification(c context.Context) error {
 		return nil
 	}
 	//请求有效时间5分钟
-	if (time.Now().Unix() - requestHeaderParams.Timestamp/1000) > 5*60 {
+	if (time.Now().Unix()-requestHeaderParams.Timestamp)/1000 > 5*60 {
 		return errors.New("您的手机时间与北京时间相差超过5分钟")
 	}
 	//请求来源
@@ -277,9 +265,8 @@ func (s *Service) verification(c context.Context) error {
 	key := conf.Config.Conf.Verification.KeyList[requestHeaderParams.Source]
 	signTemp := fmt.Sprintf("Source=%s&TimeStamp=%d&Key=%s&Weight=%s", requestHeaderParams.Source, requestHeaderParams.Timestamp, key, requestHeaderParams.Random)
 	localSign := fmt.Sprintf("%X", md5.Sum([]byte(signTemp)))
-	fmt.Println(signTemp, localSign)
 	//验证sign
-	if requestHeaderParams.Sign != localSign {
+	if subtle.ConstantTimeCompare([]byte(requestHeaderParams.Sign), []byte(localSign)) != 1 {
 		return errors.New(RequestFailTip)
 	}
 	redis := &utils.RedisService{}
@@ -287,7 +274,7 @@ func (s *Service) verification(c context.Context) error {
 	if err := redis.SetKey(localSign).RedisGetSign(); err == nil {
 		return errors.New("请勿重复访问")
 	} else {
-		redis.SetKey(localSign).SetValue("1").SetExp(conf.RedisSignExp).RedisSetAndEx()
+		redis.SetKey(localSign).SetValue("1").SetExp(strconv.Itoa(conf.RedisSignExp)).RedisSetAndEx()
 	}
 	return nil
 }

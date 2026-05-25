@@ -42,10 +42,23 @@ func GetUserId(c context.Context) int64 {
 }
 
 func GetFieldVal(data map[string]interface{}, key string) (username string) {
-	if data != nil {
-		return data[conf.Config.Conf.Verification.SourceRedisList[data["source"].(string)]].(map[string]interface{})[key].(string)
+	if data == nil {
+		return
 	}
-	return
+	source, ok := data["source"].(string)
+	if !ok {
+		return
+	}
+	redisKey := conf.Config.Conf.Verification.SourceRedisList[source]
+	info, ok := data[redisKey].(map[string]interface{})
+	if !ok {
+		return
+	}
+	val, ok := info[key].(string)
+	if !ok {
+		return
+	}
+	return val
 }
 
 func GetUserInfo(c context.Context) (result map[string]interface{}, err error) {
@@ -66,8 +79,12 @@ func GetTokenKey(key string, id int64, source string) string {
 }
 
 func GetSource(data map[string]interface{}) string {
-	if data != nil {
-		return conf.Config.Conf.Verification.SourceExplainList[data["source"].(string)]
+	if data == nil {
+		return ""
 	}
-	return ""
+	source, ok := data["source"].(string)
+	if !ok {
+		return ""
+	}
+	return conf.Config.Conf.Verification.SourceExplainList[source]
 }

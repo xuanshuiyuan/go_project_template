@@ -2,9 +2,11 @@
 package alioss
 
 import (
+	"fmt"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/xuanshuiyuan/goxy"
 	"go_project_template/internal/conf"
+	"sync"
 )
 
 type Alioss struct {
@@ -12,9 +14,9 @@ type Alioss struct {
 }
 
 var (
-	//Client *base
 	log       *goxy.Logs
 	ossBucket *oss.Bucket
+	ossOnce   sync.Once
 )
 
 func NewAlioss() *Alioss {
@@ -23,26 +25,24 @@ func NewAlioss() *Alioss {
 	}
 }
 
-// @Title NewBucket
-// @Description 初始化阿里云OSS
-// @Author xuanshuiyuan 2021-10-22 17:14:47
-// @Param
-// @Return *oss.Bucket
-func NewBucket() *oss.Bucket {
-	if ossBucket != nil {
-		return ossBucket
+func NewBucket() (*oss.Bucket, error) {
+	var initErr error
+	ossOnce.Do(func() {
+		client, err := oss.New(conf.Config.Conf.Oss.Endpoint, conf.Config.Conf.Oss.AccessKeyId, conf.Config.Conf.Oss.AccessKeySecret)
+		if err != nil {
+			log.Error(conf.Config.Base.LogFileName, "error.log").Println(goxy.FmtLog(err.Error()))
+			initErr = fmt.Errorf("oss client init failed: %w", err)
+			return
+		}
+		ossBucket, err = client.Bucket(conf.Config.Conf.Oss.BucketName)
+		if err != nil {
+			log.Error(conf.Config.Base.LogFileName, "error.log").Println(goxy.FmtLog(err.Error()))
+			initErr = fmt.Errorf("oss bucket init failed: %w", err)
+			return
+		}
+	})
+	if initErr != nil {
+		return nil, initErr
 	}
-	// 创建OSSClient实例。
-	client, err := oss.New(conf.Config.Conf.Oss.Endpoint, conf.Config.Conf.Oss.AccessKeyId, conf.Config.Conf.Oss.AccessKeySecret)
-	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "error.log").Println(goxy.FmtLog(err.Error()))
-		panic(err.Error())
-	}
-	// 获取存储空间。
-	ossBucket, err = client.Bucket(conf.Config.Conf.Oss.BucketName)
-	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "error.log").Println(goxy.FmtLog(err.Error()))
-		panic(err.Error())
-	}
-	return ossBucket
+	return ossBucket, nil
 }

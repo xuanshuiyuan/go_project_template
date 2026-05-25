@@ -3,9 +3,11 @@ package delay_queue
 
 import (
 	"context"
+	"fmt"
+	"go_project_template/internal/conf"
+
 	"github.com/xuanshuiyuan/delay_queue"
 	"github.com/xuanshuiyuan/goxy"
-	"go_project_template/internal/conf"
 )
 
 var (
@@ -19,28 +21,39 @@ func New() {
 }
 
 func Push(taskName, message string) (err error) {
-	var ctx context.Context
+	ctx := context.Background()
 	if err = delay_queue.NewProducer().RegisterRedis(newRedis()).PushMessage(ctx, taskName, message); err != nil {
-		log.Error(conf.Config.Base.LogFileName, "DelayQueue.log").Println(err)
+		logDelayQueueError(err)
 		return err
 	}
 	return
 }
 
 func PushT(taskName, message string, time int64) (err error) {
-	var ctx context.Context
+	ctx := context.Background()
 	if err = delay_queue.NewProducer().RegisterRedis(newRedis()).PushMessageT(ctx, taskName, time, message); err != nil {
-		log.Error(conf.Config.Base.LogFileName, "DelayQueue.log").Println(err)
+		logDelayQueueError(err)
 		return err
 	}
 	return
 }
 
 func Delete(taskName, message string) (err error) {
-	var ctx context.Context
+	ctx := context.Background()
 	if err = delay_queue.NewProducer().RegisterRedis(newRedis()).DeleteMessage(ctx, taskName, message); err != nil {
-		log.Error(conf.Config.Base.LogFileName, "DelayQueue.log").Println(err)
+		logDelayQueueError(err)
 		return err
 	}
 	return
+}
+
+func logDelayQueueError(err error) {
+	if err == nil {
+		return
+	}
+	if log != nil && conf.Config != nil && conf.Config.Base != nil {
+		log.Error(conf.Config.Base.LogFileName, "DelayQueue.log").Println(err)
+		return
+	}
+	fmt.Println("delay queue error:", err)
 }

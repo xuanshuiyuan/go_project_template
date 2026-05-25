@@ -1,4 +1,3 @@
-// @Author xuanshuiyuan 2025/2/7 10:51:00
 package web
 
 import (
@@ -18,5 +17,5 @@ func NewUtils() *Utils {
 }
 
 func (u *Utils) Test(c context.Context) {
-	result.Echo(c, goxy.StatusOK, "")
+	goxy.NewIrisHttpResult().Echo(c, goxy.StatusOK, "")
 }

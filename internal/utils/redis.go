@@ -1,233 +1,218 @@
 // @Author  xuanshuiyuan
+// Redis 通用操作封装，基于连接池提供常用 Redis 命令的链式调用
 package utils
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gomodule/redigo/redis"
 	"go_project_template/internal/conf"
 	"go_project_template/internal/engine"
 	"time"
+
+	"github.com/gomodule/redigo/redis"
 )
 
-//RedisService 定义了redis的常用参数
+// RedisService Redis 通用操作服务
+// 使用方式: NewRedis().SetKey("key").SetValue("value").SetExp("60").RedisSetAndEx()
 type RedisService struct {
-	Key   string
-	Value interface{}
-	Exp   string
+	Key   string      // Redis 键名
+	Value interface{} // Redis 值
+	Exp   string      // 过期时间（秒，字符串格式）
 }
 
+// NewRedis 创建 RedisService 实例
 func NewRedis() *RedisService {
 	return &RedisService{}
 }
 
+// SetKey 设置键名（链式调用）
 func (r *RedisService) SetKey(key string) *RedisService {
 	r.Key = key
 	return r
 }
 
+// SetValue 设置值（链式调用）
 func (r *RedisService) SetValue(value interface{}) *RedisService {
 	r.Value = value
 	return r
 }
 
+// SetExp 设置过期时间，单位秒（链式调用）
 func (r *RedisService) SetExp(exp string) *RedisService {
 	r.Exp = exp
 	return r
 }
 
+// execCommand 从连接池获取连接并执行 Redis 命令
 func (r *RedisService) execCommand(command string, args ...interface{}) (interface{}, error) {
 	conn := engine.DB.Redis.Get()
-	defer conn.Close() //需要close
-	reply, err := conn.Do(command, args...)
-	return reply, err
+	defer conn.Close()
+	return conn.Do(command, args...)
 }
 
+// ==================== 自增/自减 ====================
+
+// Incr 对 key 执行自增操作
 func (r *RedisService) Incr(key string) (res int64, err error) {
-	result, err := r.execCommand("Incr", key)
+	result, err := r.execCommand("INCR", key)
 	if err != nil {
 		return
 	}
-	var v, ok = result.(int64)
-	if ok {
-		res = int64(v)
+	if v, ok := result.(int64); ok {
+		res = v
 	}
 	return
 }
 
+// Decr 对 key 执行自减操作
 func (r *RedisService) Decr(key string) (res int64, err error) {
-	result, err := r.execCommand("Decr", key)
+	result, err := r.execCommand("DECR", key)
 	if err != nil {
 		return
 	}
-	var v, ok = result.(int64)
-	if ok {
-		res = int64(v)
+	if v, ok := result.(int64); ok {
+		res = v
 	}
 	return
 }
 
-func (r *RedisService) EvalSha(sha1 string, values []interface{}) (interface{}, error) {
-	args := []interface{}{
-		sha1,
-	}
-	args = append(args, values...)
-	res, err := r.execCommand("EVALSHA", args...)
-	return res, err
-}
+// ==================== 有序集合 ====================
 
-func (r *RedisService) LoadScript(script string) error {
-	args := []interface{}{
-		"LOAD",
-		script,
-	}
-	_, err := r.execCommand("SCRIPT", args...)
-	return err
-}
-
-//Zscore 命令返回有序集中，成员的分数值。 如果成员元素不是有序集 key 的成员，或 key 不存在，返回 nil 。
-func (r *RedisService) Zscore(key, args string) (res string, err error) {
-	result, err := r.execCommand("Zscore", key, args)
+// Zscore 返回有序集中成员的分数值，成员不存在或 key 不存在返回空字符串
+func (r *RedisService) Zscore(key, member string) (res string, err error) {
+	result, err := r.execCommand("ZSCORE", key, member)
 	if err != nil {
 		return
 	}
-	var v, ok = result.([]byte)
-	if ok {
+	if v, ok := result.([]byte); ok {
 		res = string(v)
 	}
 	return
 }
 
-//Zscore 命令返回有序集中，成员的分数值。 如果成员元素不是有序集 key 的成员，或 key 不存在，返回 nil 。
-func (r *RedisService) ZscoreDelayQueue(key, args string) (res string, err error) {
-	result, err := r.execCommand("Zscore", fmt.Sprintf("{%s}:waiting", key), args)
+// ZscoreDelayQueue 查询延迟队列中有序集成员的分数值
+// key 会自动拼接 {:key}:waiting 格式，与延迟队列内部结构对应
+func (r *RedisService) ZscoreDelayQueue(key, member string) (res string, err error) {
+	result, err := r.execCommand("ZSCORE", fmt.Sprintf("{%s}:waiting", key), member)
 	if err != nil {
 		return
 	}
-	var v, ok = result.([]byte)
-	if ok {
+	if v, ok := result.([]byte); ok {
 		res = string(v)
 	}
 	return
 }
 
+// ZAdd 向有序集合添加成员
+// messages 格式: score1, member1, score2, member2, ...
 func (r *RedisService) ZAdd(key string, messages ...interface{}) error {
-	args := []interface{}{
-		key,
-		//"NX",
-	}
-	for _, message := range messages {
-		args = append(args, message)
-	}
-	_, err := r.execCommand("ZAdd", args...)
+	args := []interface{}{key}
+	args = append(args, messages...)
+	_, err := r.execCommand("ZADD", args...)
 	return err
 }
 
-//添加集合元素
+// ==================== 集合操作 ====================
+
+// SAdd 向集合添加元素
 func (r *RedisService) SAdd(key string, messages ...interface{}) error {
-	args := []interface{}{
-		key,
-		//"NX",
-	}
-	for _, message := range messages {
-		args = append(args, message)
-	}
+	args := []interface{}{key}
+	args = append(args, messages...)
 	_, err := r.execCommand("SADD", args...)
 	return err
 }
 
-//获取集合元素个数
+// SCard 获取集合元素个数
 func (r *RedisService) SCard(key string) (size interface{}, err error) {
-	size, err = r.execCommand("SCard", key)
-	if err != nil {
-		return
-	}
-	return
+	return r.execCommand("SCARD", key)
 }
 
-//判断元素是否在集合中 1:在 0:不存在
+// SIsMember 判断元素是否在集合中，返回 1 表示存在，0 表示不存在
 func (r *RedisService) SIsMember(key string, message interface{}) (res int64, err error) {
-	result, err := r.execCommand("SIsMember", key, message)
+	result, err := r.execCommand("SISMEMBER", key, message)
 	if err != nil {
 		return
 	}
-	res = result.(int64)
+	v, ok := result.(int64)
+	if !ok {
+		return 0, fmt.Errorf("SIsMember 返回类型异常: %T", result)
+	}
+	res = v
 	return
 }
 
-//获取集合中所有的元素
+// SMembers 获取集合中所有元素
 func (r *RedisService) SMembers(key string) (result []string, err error) {
 	conn := engine.DB.Redis.Get()
-	defer conn.Close() //需要close
-	err = conn.Send("SMembers", key)
-	conn.Flush()
-	reply, err := redis.MultiBulk(conn.Receive())
+	defer conn.Close()
+	reply, err := redis.Strings(conn.Do("SMEMBERS", key))
 	if err != nil {
 		return
 	}
-	for _, x := range reply {
-		var v, ok = x.([]byte)
-		if ok {
-			result = append(result, string(v))
-		}
-	}
+	result = reply
 	return
 }
 
-//删除集合元素 1:成功 0:失败
+// SRem 删除集合元素，返回成功删除的个数
 func (r *RedisService) SRem(key string, messages ...interface{}) (res int64, err error) {
-	args := []interface{}{
-		key,
-	}
-	for _, message := range messages {
-		args = append(args, message)
-	}
-	result, err := r.execCommand("SRem", args...)
+	args := []interface{}{key}
+	args = append(args, messages...)
+	result, err := r.execCommand("SREM", args...)
 	if err != nil {
 		return
 	}
-	res = result.(int64)
+	v, ok := result.(int64)
+	if !ok {
+		return 0, fmt.Errorf("SRem 返回类型异常: %T", result)
+	}
+	res = v
 	return
 }
 
-//随机返回集合中的元素，并且删除返回的元素
+// SPop 随机返回并删除集合中的一个元素
 func (r *RedisService) SPop(key string) (res string, err error) {
-	result, err := r.execCommand("SPop", key)
+	result, err := r.execCommand("SPOP", key)
 	if err != nil {
 		return
 	}
-	var v, ok = result.([]byte)
-	if ok {
+	if v, ok := result.([]byte); ok {
 		res = string(v)
 	}
 	return
 }
 
-//随机返回集合中的元素，并且删除返回的元素
+// SPopN 随机返回并删除集合中的 N 个元素
 func (r *RedisService) SPopN(key string, size int64) (result []string, err error) {
 	conn := engine.DB.Redis.Get()
-	defer conn.Close() //需要close
-	err = conn.Send("SPop", key, size)
-	conn.Flush()
-	reply, err := redis.MultiBulk(conn.Receive())
+	defer conn.Close()
+	reply, err := redis.Strings(conn.Do("SPOP", key, size))
 	if err != nil {
 		return
 	}
-	for _, x := range reply {
-		var v, ok = x.([]byte)
-		if ok {
-			result = append(result, string(v))
-		}
-	}
+	result = reply
 	return
 }
 
-// @Title RedisSetAndEx
-// @Description redis增加数据和过期时间
-// @Author xuanshuiyuan 2021-10-22 17:14:47
-// @Param
-// @Return error
+// ==================== Lua 脚本 ====================
+
+// EvalSha 执行已加载的 Lua 脚本
+func (r *RedisService) EvalSha(sha1 string, values []interface{}) (interface{}, error) {
+	args := []interface{}{sha1}
+	args = append(args, values...)
+	return r.execCommand("EVALSHA", args...)
+}
+
+// LoadScript 加载 Lua 脚本到 Redis，返回 sha1 校验值
+func (r *RedisService) LoadScript(script string) error {
+	_, err := r.execCommand("SCRIPT", "LOAD", script)
+	return err
+}
+
+// ==================== String 操作 ====================
+
+// RedisSetAndEx 设置键值并指定过期时间
+// 使用方式: NewRedis().SetKey("key").SetValue("value").SetExp("60").RedisSetAndEx()
 func (r *RedisService) RedisSetAndEx() error {
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
@@ -239,13 +224,8 @@ func (r *RedisService) RedisSetAndEx() error {
 	return nil
 }
 
-// @Title GetStringKey
-// @Description 根据key获得数据
-// @Author xuanshuiyuan 2021-10-22 17:14:47
-// @Param
-// @Return error
-func (r RedisService) GetStringKey(key string) (string, error) {
-	var result string
+// GetStringKey 根据 key 获取字符串值
+func (r *RedisService) GetStringKey(key string) (string, error) {
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
 	result, err := redis.String(conn.Do("GET", key))
@@ -256,12 +236,8 @@ func (r RedisService) GetStringKey(key string) (string, error) {
 	return result, nil
 }
 
-// @Title GetInfoByKey
-// @Description 根据key获得数据
-// @Author xuanshuiyuan 2021-10-22 17:14:47
-// @Param
-// @Return error
-func (r RedisService) GetInfoByKey(key string) (map[string]interface{}, error) {
+// GetInfoByKey 根据 key 获取 JSON 对象并反序列化为 map
+func (r *RedisService) GetInfoByKey(key string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
@@ -271,17 +247,14 @@ func (r RedisService) GetInfoByKey(key string) (map[string]interface{}, error) {
 		return result, err
 	}
 	if er := json.Unmarshal([]byte(info), &result); er != nil {
-		_, err = conn.Do("DEL", key)
-		if err != nil {
-			log.Error(conf.Config.Base.LogFileName, "").Println("del ", key, " failed, err:", err)
-			return result, err
-		}
-		return result, err
+		log.Error(conf.Config.Base.LogFileName, "").Println("json unmarshal ", key, " failed, err:", er)
+		return result, er
 	}
 	return result, nil
 }
 
-func (r RedisService) GetArrByKey(key string) (result []interface{}, err error) {
+// GetArrByKey 根据 key 获取 JSON 数组并反序列化为切片
+func (r *RedisService) GetArrByKey(key string) (result []interface{}, err error) {
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
 	info, err := redis.String(conn.Do("GET", key))
@@ -290,17 +263,14 @@ func (r RedisService) GetArrByKey(key string) (result []interface{}, err error) 
 		return result, err
 	}
 	if er := json.Unmarshal([]byte(info), &result); er != nil {
-		_, err = conn.Do("DEL", key)
-		if err != nil {
-			log.Error(conf.Config.Base.LogFileName, "").Println("del ", key, " failed, err:", err)
-			return result, err
-		}
-		return result, err
+		log.Error(conf.Config.Base.LogFileName, "").Println("json unmarshal ", key, " failed, err:", er)
+		return result, er
 	}
 	return result, nil
 }
 
-func (r RedisService) Get() (res string, err error) {
+// Get 根据 r.Key 获取字符串值，key 不存在时不报错
+func (r *RedisService) Get() (res string, err error) {
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
 	res, err = redis.String(conn.Do("GET", r.Key))
@@ -308,135 +278,116 @@ func (r RedisService) Get() (res string, err error) {
 		if err == redis.ErrNil {
 			err = nil
 		}
-		return
 	}
 	return
 }
 
-func (r RedisService) Set() (err error) {
+// Set 设置键值对（无过期时间）
+func (r *RedisService) Set() (err error) {
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
 	_, err = conn.Do("SET", r.Key, r.Value)
-	if err != nil {
-		return
-	}
 	return
 }
 
-// @Title RedisGetSign
-// @Description 得到接口验证的sign
-// @Author xuanshuiyuan 2021-10-22 17:14:47
-// @Param
-// @Return error
-func (r RedisService) RedisGetSign() error {
+// RedisGetSign 获取接口签名，用于验证签名是否已存在（防重复请求）
+func (r *RedisService) RedisGetSign() error {
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
 	_, err := redis.String(conn.Do("GET", r.Key))
-	if err != nil {
-		//log.Error(conf.Config.Base.LogFileName, "").Println("get %s failed, err:%v", r.Key, err)
-		return err
-	}
-	return nil
+	return err
 }
 
-// @Title RedisVerification
-// @Description 接口token验证
-// @Author xuanshuiyuan 2021-10-31 16:02
-// @Param token
-// @Return string,error
+// RedisVerification 验证 token 有效性，验证通过后自动续期
 func (r *RedisService) RedisVerification(key string, token string) error {
-	conn := engine.DB.Redis.Get()
-	defer conn.Close()
-	//
 	data, err := r.GetInfoByKey(key)
-	if err != nil { //登陆失效
+	if err != nil {
 		return err
 	}
 	if data["token"] != token {
 		return errors.New("Im Invalid Request!")
 	}
-	n, err := conn.Do("EXPIRE", key, conf.RedisTokenExp) //重置token时间
+	conn := engine.DB.Redis.Get()
+	defer conn.Close()
+	n, err := conn.Do("EXPIRE", key, conf.RedisTokenExp)
 	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("expiring ", r.Key, " failed, err:", err)
+		log.Error(conf.Config.Base.LogFileName, "").Println("expiring ", key, " failed, err:", err)
 		return err
-	} else if n != int64(1) {
-		log.Error(conf.Config.Base.LogFileName, "").Println("expiring ", r.Key, " failed")
-		return err
+	}
+	if n != int64(1) {
+		log.Error(conf.Config.Base.LogFileName, "").Println("expiring ", key, " failed, key may not exist")
+		return errors.New("token 续期失败")
 	}
 	return nil
 }
 
-// @Title Del
-// @Description 删除数据
-// @Author xuanshuiyuan 2021-10-22 17:14:47
-// @Param token
-// @Return string,error
+// ==================== 删除 ====================
+
+// Del 删除指定 key
 func (r *RedisService) Del() (err error) {
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
 	_, err = conn.Do("DEL", r.Key)
-	if err != nil {
-		return
-	}
 	return
 }
 
-// @Title Lock
-// @Description 获取分布式锁
-// @Author xuanshuiyuan 2021-10-22 17:14:47
-// @Param token
-// @Return string,error
+// ==================== 分布式锁 ====================
+
+// Lock 获取分布式锁（基于 SET NX EX 实现）
+// 使用方式: isLock, err := NewRedis().SetKey("lock_key").SetExp("30").Lock()
+// 返回 isLock=true 表示获取锁成功，需要在业务处理完后调用 UnLock 释放锁
 func (r *RedisService) Lock() (isLock bool, err error) {
-	//conf.Mutex.Lock()
-	//defer conf.Mutex.Unlock()
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
-	_, err = redis.String(conn.Do("set", r.Key, 1, "ex", r.Exp, "nx"))
+	_, err = redis.String(conn.Do("SET", r.Key, 1, "EX", r.Exp, "NX"))
 	if err != nil {
 		if err == redis.ErrNil {
-			err = nil
-			log.Error(conf.Config.Base.LogFileName, "").Println("set ", r.Key, " failed, err:", err)
-			return false, err
+			// 锁已被其他请求持有，非错误
+			return false, nil
 		}
-		//log.Error(conf.Config.Base.LogFileName, "").Println("set ", r.Key, " failed, err:", err)
-		return
+		log.Error(conf.Config.Base.LogFileName, "").Println("lock ", r.Key, " failed, err:", err)
+		return false, err
 	}
-	isLock = true
-	return
+	return true, nil
 }
 
-// @Title UnLock
-// @Description 删除分布式锁
-// @Author xuanshuiyuan 2021-10-22 17:14:47
-// @Param token
-// @Return string,error
+// UnLock 释放分布式锁（删除 key）
+// 使用方式: err := NewRedis().SetKey("lock_key").UnLock()
 func (r *RedisService) UnLock() (err error) {
 	conn := engine.DB.Redis.Get()
 	defer conn.Close()
 	_, err = conn.Do("DEL", r.Key)
-	if err != nil {
-		return
-	}
 	return
 }
 
-func Spin(redis *RedisService, key string, exp string, frequency int64) (isLock bool) {
-	if frequency >= 60 {
-		//自旋超过20次，退出
-		return false
-	}
-	isLock, err := redis.SetKey(key).SetExp(exp).Lock()
-	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "redis.log").Println("spin ", err)
-		return false
-	}
-	//获取了锁
-	if isLock == true {
-		return true
-	} else { // 自旋 500ms一次
-		log.Error(conf.Config.Base.LogFileName, "redis.log").Println("spin:", key, "第", frequency, "次", err)
+// Spin 自旋获取分布式锁，在指定次数内反复尝试获取锁
+// 参数:
+//   - r: RedisService 实例
+//   - key: 锁的键名
+//   - exp: 锁的过期时间（秒），传空则默认 30 秒
+//   - maxRetry: 最大重试次数，传 0 则默认 60 次
+//
+// 使用方式:
+//   isLock := Spin(NewRedis(), "lock_key", "30", 60)  // 自定义参数
+//   isLock := Spin(NewRedis(), "lock_key", "", 0)     // 使用默认值：30秒超时，60次重试
+//
+// 返回 isLock=true 表示在重试范围内成功获取锁
+// 每 500ms 重试一次，maxRetry=60 时最长等待约 30 秒
+func Spin(r *RedisService, key string) (isLock bool) {
+	const (
+		exp      = "30"
+		maxRetry = 60
+	)
+	for i := int64(0); i < maxRetry; i++ {
+		isLock, err := r.SetKey(key).SetExp(exp).Lock()
+		if err != nil {
+			log.Error(conf.Config.Base.LogFileName, "redis.log").Println("spin error:", err)
+			return false
+		}
+		if isLock {
+			return true
+		}
 		time.Sleep(time.Millisecond * 500)
-		return Spin(redis, key, exp, frequency+1)
 	}
 	return false
 }

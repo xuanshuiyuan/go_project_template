@@ -1,15 +1,10 @@
-// @Author  xuanshuiyuan
 package route
 
 import (
 	"github.com/kataras/iris/v12/mvc"
-	"github.com/xuanshuiyuan/goxy"
 	"go_project_template/internal/conf"
 	"go_project_template/internal/controllers/web"
 )
-
-var result *goxy.IrisHttpResult
-var log *goxy.Logs
 
 // Service 模块对象 定义了不同客户端的接口
 type Service struct {

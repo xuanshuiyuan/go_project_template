@@ -4,6 +4,7 @@ package delay_queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/xuanshuiyuan/delay_queue"
 	"reflect"
@@ -12,10 +13,22 @@ import (
 var (
 	DelayQueueGeneralDelayTime = 10
 	DelayQueueGeneralName      = "delay-queue-General"
+
+	ErrGeneralMessageInvalid   = errors.New("general delay queue message invalid")
+	ErrGeneralMethodNameEmpty  = errors.New("general delay queue method_name is empty")
+	ErrGeneralMethodNotFound   = errors.New("general delay queue method not found")
+	ErrGeneralMethodSignatures = errors.New("general delay queue method signature invalid")
 )
 
 type DelayQueueGeneralConsumer struct {
 }
+
+type generalMessage struct {
+	MethodName string `json:"method_name"`
+	Value      string `json:"value"`
+}
+
+var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
 func NewGeneral() delay_queue.Task {
 	return delay_queue.Task{
@@ -33,13 +46,11 @@ func NewGeneral() delay_queue.Task {
 //MethodByName value
 func (d DelayQueueGeneralConsumer) Deal(ctx context.Context, task delay_queue.Task, messages []string) error {
 	for _, v := range messages {
-		var val = make(map[string]interface{})
-		if err := json.Unmarshal([]byte(v), &val); err != nil {
+		payload, err := decodeGeneralMessage(v)
+		if err != nil {
 			return err
 		}
-		res := reflect.ValueOf(d).MethodByName(val["method_name"].(string)).Call([]reflect.Value{reflect.ValueOf(val["value"].(string))})
-		if res[0].Interface() != nil && res[0].Interface().(error) != nil {
-			err := res[0].Interface().(error)
+		if err := d.call(payload.MethodName, payload.Value); err != nil {
 			return err
 		}
 	}
@@ -51,18 +62,55 @@ func (d DelayQueueGeneralConsumer) Error(ctx context.Context, task delay_queue.T
 }
 
 func Add(method_name, message string, time int64) {
-	var val = make(map[string]interface{})
-	val["method_name"] = method_name
-	val["value"] = message
-	params, _ := json.Marshal(val)
-	PushT(DelayQueueGeneralName, string(params), int64(int(time)-DelayQueueGeneralDelayTime))
+	params, err := json.Marshal(generalMessage{
+		MethodName: method_name,
+		Value:      message,
+	})
+	if err != nil {
+		return
+	}
+	_ = PushT(DelayQueueGeneralName, string(params), int64(int(time)-DelayQueueGeneralDelayTime))
 }
 
 func Deletes(method_name, message string) (err error) {
-	var val = make(map[string]interface{})
-	val["method_name"] = method_name
-	val["value"] = message
-	params, _ := json.Marshal(val)
-	Delete(DelayQueueGeneralName, string(params))
+	params, err := json.Marshal(generalMessage{
+		MethodName: method_name,
+		Value:      message,
+	})
+	if err != nil {
+		return err
+	}
+	_ = Delete(DelayQueueGeneralName, string(params))
 	return
 }
+
+func decodeGeneralMessage(raw string) (generalMessage, error) {
+	var payload generalMessage
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return generalMessage{}, fmt.Errorf("%w: %v", ErrGeneralMessageInvalid, err)
+	}
+	if payload.MethodName == "" {
+		return generalMessage{}, ErrGeneralMethodNameEmpty
+	}
+	return payload, nil
+}
+
+func (d DelayQueueGeneralConsumer) call(methodName, value string) error {
+	method := reflect.ValueOf(d).MethodByName(methodName)
+	if !method.IsValid() {
+		return fmt.Errorf("%w: %s", ErrGeneralMethodNotFound, methodName)
+	}
+	methodType := method.Type()
+	if methodType.NumIn() != 1 || methodType.In(0).Kind() != reflect.String {
+		return fmt.Errorf("%w: %s", ErrGeneralMethodSignatures, methodName)
+	}
+	if methodType.NumOut() != 1 || !methodType.Out(0).Implements(errorType) {
+		return fmt.Errorf("%w: %s", ErrGeneralMethodSignatures, methodName)
+	}
+	results := method.Call([]reflect.Value{reflect.ValueOf(value)})
+	if results[0].IsNil() {
+		return nil
+	}
+	return fmt.Errorf("general method %s: %w", methodName, results[0].Interface().(error))
+}
+

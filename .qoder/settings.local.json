@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /home/xuanshuiyuan/data/go/src/go_project_template -name \"*.go\" -not -path \"*/vendor/*\" | head -50)",
+      "Bash(go build:*)",
+      "Bash(/usr/local/go/bin/go build ./... 2>&1)"
+    ]
+  }
+}

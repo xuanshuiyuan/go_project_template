@@ -20,8 +20,9 @@ type SimpleUploadService struct {
 }
 
 func NewSimpleUpload() *SimpleUploadService {
+	bucket, _ := NewBucket()
 	var s = &SimpleUploadService{
-		bucket: NewBucket(),
+		bucket: bucket,
 	}
 	return s
 }
@@ -47,13 +48,12 @@ func (s *SimpleUploadService) SetObjectName(objectName string) *SimpleUploadServ
 // @Param
 // @Return string, error
 func (s *SimpleUploadService) UploadLocalFile() (string, error) {
-	// 读取本地文件。
 	fd, err := os.Open(s.file)
-	defer fd.Close()
 	if err != nil {
 		log.Error(conf.Config.Base.LogFileName, "alioss.log").Println(goxy.FmtLog(err.Error()))
 		return "", err
 	}
+	defer fd.Close()
 	// 上传文件流。
 	suffix := path.Ext(s.file)
 	var filename = fmt.Sprintf("%s/%s/%s/%d-%s%s", conf.Config.Conf.Oss.RootPath, s.catalogue, goxy.YmdStr(), time.Now().Unix(), goxy.RandChar(5), suffix)
@@ -71,13 +71,12 @@ func (s *SimpleUploadService) UploadLocalFile() (string, error) {
 // @Param
 // @Return string, error
 func (s *SimpleUploadService) UploadLocalFileNoName() (string, error) {
-	// 读取本地文件。
 	fd, err := os.Open(s.file)
-	defer fd.Close()
 	if err != nil {
 		log.Error(conf.Config.Base.LogFileName, "alioss.log").Println(goxy.FmtLog(err.Error()))
 		return "", err
 	}
+	defer fd.Close()
 	// 上传文件流。
 	d := strings.Split(s.file, "/")
 	var filename = fmt.Sprintf("%s/%s/%s/%s", conf.Config.Conf.Oss.RootPath, s.catalogue, goxy.YmdStr(), d[len(d)-1])

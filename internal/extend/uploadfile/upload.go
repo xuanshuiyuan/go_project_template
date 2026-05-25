@@ -209,7 +209,6 @@ func Delete(u UploadEr) error {
 }
 
 func (a *AliOss) Delete(file []string) (err error) {
-	fmt.Println(file)
 	_, err = a.upload.SimpleUpload.DeleteObjects(file)
 	if err != nil {
 		return
@@ -238,7 +237,7 @@ func saveUploadedFile(fh *multipart.FileHeader, destDirectory string) (int64, er
 	}
 	defer src.Close()
 	out, err := os.OpenFile(filepath.Join(destDirectory, fh.Filename),
-		os.O_WRONLY|os.O_CREATE, os.FileMode(0666))
+		os.O_WRONLY|os.O_CREATE, os.FileMode(0644))
 	if err != nil {
 		return 0, err
 	}

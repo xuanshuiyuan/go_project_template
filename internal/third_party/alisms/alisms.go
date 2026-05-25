@@ -3,6 +3,7 @@ package alisms
 
 import (
 	"errors"
+	"fmt"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/client"
 	dysmsapi20170525 "github.com/alibabacloud-go/dysmsapi-20170525/v2/client"
 	"github.com/alibabacloud-go/tea/tea"
@@ -36,9 +37,22 @@ func NewAlisms() {
 
 func NewGgcAlisms() *Alisms {
 	var init = &Alisms{}
-	var accessKeyId = conf.Sms["AlismsGgc"]["accessKeyId"].(string)
-	var accessKeySecret = conf.Sms["AlismsGgc"]["accessKeySecret"].(string)
-	init.SetAccessKeyId(&accessKeyId).SetAccessKeySecret(&accessKeySecret).NewAlismsClient()
+	smsConf, ok := conf.Sms["AlismsGgc"]
+	if !ok {
+		panic("AlismsGgc config not found")
+	}
+	accessKeyId, ok := smsConf["accessKeyId"].(string)
+	if !ok {
+		panic("AlismsGgc accessKeyId not found or not string")
+	}
+	accessKeySecret, ok := smsConf["accessKeySecret"].(string)
+	if !ok {
+		panic("AlismsGgc accessKeySecret not found or not string")
+	}
+	init.SetAccessKeyId(&accessKeyId).SetAccessKeySecret(&accessKeySecret)
+	if err := init.NewAlismsClient(); err != nil {
+		panic(err)
+	}
 	return init
 }
 
@@ -58,20 +72,18 @@ func (a *Alisms) SetAccessKeySecret(accessKeySecret *string) *Alisms {
 // @return Client
 // @throws Exception
 //
-func (a *Alisms) NewAlismsClient() {
+func (a *Alisms) NewAlismsClient() error {
 	config := &openapi.Config{
-		// 您的AccessKey ID
-		AccessKeyId: a.AccessKeyId,
-		// 您的AccessKey Secret
+		AccessKeyId:     a.AccessKeyId,
 		AccessKeySecret: a.AccessKeySecret,
 	}
-	// 访问的域名
 	config.Endpoint = tea.String("dysmsapi.aliyuncs.com")
 	client, err := dysmsapi20170525.NewClient(config)
 	if err != nil {
-		panic("Alisms初始化失败" + err.Error())
+		return fmt.Errorf("Alisms初始化失败: %w", err)
 	}
 	a.Client = client
+	return nil
 }
 
 func (a *Alisms) SendSms(phoneNumbers string, signName string, templateCode string, templateParam string,

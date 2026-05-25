@@ -46,16 +46,18 @@ type Doctron struct {
 
 //Mysql mysql数据库的配置
 type Mysql struct {
-	Hostname  string
-	Username  string
-	Password  string
-	Port      int32
-	DataBase  string
-	Drive     string
-	Network   string
-	Charset   string
-	TimeZone  string
-	DbLogMode bool
+	Hostname      string
+	Username      string
+	Password      string
+	Port          int32
+	DataBase      string
+	Drive         string
+	Network       string
+	Charset       string
+	TimeZone      string
+	DbLogMode     bool
+	MaxIdleConns  int
+	MaxOpenConns  int
 }
 
 //Redis redis的配置
@@ -75,11 +77,12 @@ type Redis struct {
 
 //Mongodb mongodb的配置
 type Mongodb struct {
-	Hostname   string
-	Username   string
-	Password   string
-	Port       int32
-	ConnectStr string
+	Hostname    string
+	Username    string
+	Password    string
+	Port        int32
+	ConnectStr  string
+	MaxPoolSize uint64
 }
 
 type Nsq struct {

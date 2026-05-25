@@ -1,64 +1,73 @@
 // @Author xuanshuiyuan
+// HTTP 请求封装包：支持 GET/POST/PostForm/PostJson/PostByte 等请求方式
+// 所有请求复用全局 http.Client，自动处理 BOM 头和 JSON 反序列化
 package utils
 
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/xuanshuiyuan/goxy"
-	"go_project_template/internal/conf"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/xuanshuiyuan/goxy"
+	"go_project_template/internal/conf"
 )
 
+// httpClient 全局复用的 HTTP 客户端，避免每次请求创建新连接
+var httpClient = &http.Client{}
+
+// CurlService HTTP 请求服务，支持链式调用
+// 使用方式:
+//   result, err := NewCurl().SetUrl("https://api.example.com/data").SetValue(map[string]interface{}{"key": "val"}).PostJson()
 type CurlService struct {
-	Url     string
-	Value   map[string]interface{}
-	Headers map[string]string
+	Url     string                 // 请求地址
+	Value   map[string]interface{} // 请求参数
+	Headers map[string]string      // 自定义请求头
 }
 
-//var Curl *CurlService
-
+// NewCurl 创建 CurlService 实例
 func NewCurl() *CurlService {
 	return &CurlService{}
 }
 
+// SetUrl 设置请求地址（链式调用）
 func (c *CurlService) SetUrl(url string) *CurlService {
 	c.Url = url
 	return c
 }
 
+// SetValue 设置请求参数（链式调用）
 func (c *CurlService) SetValue(value map[string]interface{}) *CurlService {
 	c.Value = value
 	return c
 }
 
+// SetHeaders 设置自定义请求头（链式调用）
 func (c *CurlService) SetHeaders(headers map[string]string) *CurlService {
 	c.Headers = headers
 	return c
 }
 
-// @Title Get
-// @Description Get请求
-// @Author xuanshuiyuan 2021/12/29 10:48:00
-// @Param
-// @Return map[string]interface{}, error
 func (c *CurlService) Get() (map[string]interface{}, error) {
 	var result = make(map[string]interface{})
-	res, err := http.Get(c.Url)
+	res, err := httpClient.Get(c.Url)
 	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("curl get failed, url:%s err:%v", c.Url, err)
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl get failed, url:%s err:%v", c.Url, err)
 		return result, err
 	}
 	defer res.Body.Close()
-	robots, err := ioutil.ReadAll(res.Body)
+	robots, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("curl get failed, ioutil.ReadAll url:%s, err:%v", c.Url, err)
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl get failed, io.ReadAll url:%s, err:%v", c.Url, err)
 		return result, err
 	}
-	robots = bytes.TrimPrefix(robots, []byte("\xef\xbb\xbf")) // Or []byte{239, 187, 191}
-	json.Unmarshal(robots, &result)
+	robots = bytes.TrimPrefix(robots, []byte("\xef\xbb\xbf"))
+	if err = json.Unmarshal(robots, &result); err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl get json unmarshal failed, url:%s, err:%v", c.Url, err)
+		return result, err
+	}
 	return result, nil
 }
 
@@ -75,131 +84,125 @@ func (c *CurlService) PostForm() (map[string]interface{}, error) {
 			DataUrlVal.Add(key, goxy.Float64ToString(val2))
 		}
 	}
-	res, err := http.NewRequest("POST", c.Url, strings.NewReader(DataUrlVal.Encode()))
+	req, err := http.NewRequest("POST", c.Url, strings.NewReader(DataUrlVal.Encode()))
 	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, url:%s err:%v", c.Url, err)
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post failed, url:%s err:%v", c.Url, err)
 		return result, err
 	}
-	res.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	if len(c.Headers) > 0 {
-		for key, header := range c.Headers {
-			res.Header.Set(key, header)
-		}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	for key, header := range c.Headers {
+		req.Header.Set(key, header)
 	}
-	client := &http.Client{}
-	resp, err := client.Do(res)
+	resp, err := httpClient.Do(req)
 	if err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post failed, url:%s err:%v", c.Url, err)
+		return result, err
 	}
 	defer resp.Body.Close()
-	robots, err := ioutil.ReadAll(resp.Body)
+	robots, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, ioutil.ReadAll url:", c.Url, "err: ", err)
+		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, io.ReadAll url:", c.Url, "err: ", err)
 		return result, err
 	}
-	robots = bytes.TrimPrefix(robots, []byte("\xef\xbb\xbf")) // Or []byte{239, 187, 191}
-	json.Unmarshal(robots, &result)
+	robots = bytes.TrimPrefix(robots, []byte("\xef\xbb\xbf"))
+	if err = json.Unmarshal(robots, &result); err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post json unmarshal failed, url:%s, err:%v", c.Url, err)
+		return result, err
+	}
 	return result, nil
 }
 
 func (c *CurlService) PostJson() (map[string]interface{}, error) {
 	var result = make(map[string]interface{})
 	postString, _ := json.Marshal(c.Value)
-	res, err := http.NewRequest("POST", c.Url, strings.NewReader(string(postString)))
-	//res, err := http.NewRequest("POST", c.Url, postString)
+	req, err := http.NewRequest("POST", c.Url, strings.NewReader(string(postString)))
 	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, url:%s err:%v", c.Url, err)
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post failed, url:%s err:%v", c.Url, err)
 		return result, err
 	}
-	res.Header.Add("Content-Type", "application/json")
-	if len(c.Headers) > 0 {
-		for key, header := range c.Headers {
-			res.Header.Set(key, header)
-		}
+	req.Header.Add("Content-Type", "application/json")
+	for key, header := range c.Headers {
+		req.Header.Set(key, header)
 	}
-	client := &http.Client{}
-	resp, err := client.Do(res)
+	resp, err := httpClient.Do(req)
 	if err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post failed, url:%s err:%v", c.Url, err)
+		return result, err
 	}
 	defer resp.Body.Close()
-	robots, err := ioutil.ReadAll(resp.Body)
+	robots, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, ioutil.ReadAll url:", c.Url, "err: ", err)
+		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, io.ReadAll url:", c.Url, "err: ", err)
 		return result, err
 	}
-	robots = bytes.TrimPrefix(robots, []byte("\xef\xbb\xbf")) // Or []byte{239, 187, 191}
-	json.Unmarshal(robots, &result)
+	robots = bytes.TrimPrefix(robots, []byte("\xef\xbb\xbf"))
+	if err = json.Unmarshal(robots, &result); err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post json unmarshal failed, url:%s, err:%v", c.Url, err)
+		return result, err
+	}
 	return result, nil
 }
 
-// @Title Post
-// @Description Post请求
-// @Author xuanshuiyuan 2021/12/29 10:48:00
-// @Param
-// @Return map[string]interface{}, error
 func (c *CurlService) Post() (map[string]interface{}, error) {
 	var result = make(map[string]interface{})
 	buffer := bytes.NewBuffer([]byte{})
 	jsonEncoder := json.NewEncoder(buffer)
-	//jsonEncoder.SetEscapeHTML(false)
-	jsonEncoder.Encode(c.Value)
-	postString := buffer
-	res, err := http.NewRequest("POST", c.Url, postString)
-	//log.Info(conf.Config.Base.LogFileName, "").Println(goxy.FmtLog("url.title", c.Url, "parmas.title", c.Value))
+	if err := jsonEncoder.Encode(c.Value); err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Println(goxy.FmtLog("title.title", "curl post encode failed", "url.title", c.Url, "error.title", err.Error()))
+		return result, err
+	}
+	req, err := http.NewRequest("POST", c.Url, buffer)
 	if err != nil {
 		log.Error(conf.Config.Base.LogFileName, "").Println(goxy.FmtLog("title.title", "curl post failed", "url.title", c.Url, "error.title", err.Error()))
 		return result, err
 	}
-	res.Header.Add("Content-Type", "application/json")
-	if len(c.Headers) > 0 {
-		for key, header := range c.Headers {
-			res.Header.Set(key, header)
-		}
+	req.Header.Add("Content-Type", "application/json")
+	for key, header := range c.Headers {
+		req.Header.Set(key, header)
 	}
-	client := &http.Client{}
-	resp, err := client.Do(res)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Error(conf.Config.Base.LogFileName, "").Println(goxy.FmtLog("title.title", "curl post", "url.title", c.Url, "error.title", err.Error()))
 		return nil, err
 	}
 	defer resp.Body.Close()
-	robots, err := ioutil.ReadAll(resp.Body)
+	robots, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, ioutil.ReadAll url:", c.Url, "err: ", err)
+		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, io.ReadAll url:", c.Url, "err: ", err)
 		return result, err
 	}
-	robots = bytes.TrimPrefix(robots, []byte("\xef\xbb\xbf")) // Or []byte{239, 187, 191}
-	json.Unmarshal(robots, &result)
-	//log.Info(conf.Config.Base.LogFileName, "").Println(goxy.FmtLog("title.title", "curl post", "url.title", c.Url, "params.title", c.Value, "res.title", result))
+	robots = bytes.TrimPrefix(robots, []byte("\xef\xbb\xbf"))
+	if err = json.Unmarshal(robots, &result); err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post json unmarshal failed, url:%s, err:%v", c.Url, err)
+		return result, err
+	}
 	return result, nil
 }
 
-// @Title Post
-// @Description Post请求
-// @Author xuanshuiyuan 2021/12/29 10:48:00
-// @Param
-// @Return map[string]interface{}, error
 func (c *CurlService) PostByte() ([]byte, error) {
-	var result = []byte{}
 	buffer := bytes.NewBuffer([]byte{})
 	jsonEncoder := json.NewEncoder(buffer)
 	jsonEncoder.SetEscapeHTML(false)
-	jsonEncoder.Encode(c.Value)
-	postString := buffer
-	res, err := http.NewRequest("POST", c.Url, postString)
-	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, url:%s err:%v", c.Url, err)
-		return result, err
+	if err := jsonEncoder.Encode(c.Value); err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post encode failed, url:%s err:%v", c.Url, err)
+		return nil, err
 	}
-	res.Header.Add("Content-Type", "application/json")
-	client := &http.Client{}
-	resp, err := client.Do(res)
+	req, err := http.NewRequest("POST", c.Url, buffer)
 	if err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post failed, url:%s err:%v", c.Url, err)
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		log.Error(conf.Config.Base.LogFileName, "").Printf("curl post failed, url:%s err:%v", c.Url, err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-	robots, err := ioutil.ReadAll(resp.Body)
+	robots, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, ioutil.ReadAll url:", c.Url, "err: ", err)
-		return result, err
+		log.Error(conf.Config.Base.LogFileName, "").Println("curl post failed, io.ReadAll url:", c.Url, "err: ", err)
+		return nil, err
 	}
 	return robots, nil
 }
